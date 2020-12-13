@@ -24,6 +24,7 @@ struct Camera{
     GLfloat last_y;
     bool first_mouse, post_effect;
     float screen_width, screen_height;
+    bool paralax;
 }camera;
 
 int funccmp_win( const void * val1, const void * val2 ){
@@ -76,6 +77,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                 camera.post_effect = false;
             }
         }
+    } 
+    if(key == GLFW_KEY_P){
+        if(action == GLFW_PRESS){
+            if(camera.paralax == false){
+                camera.paralax = true;
+            }else{
+                camera.paralax = false;
+            } 
+        }
     }
 }
 
@@ -108,7 +118,7 @@ int camera_step(){
     GLfloat new_time = glfwGetTime();
     camera.delta_time = new_time - camera.last_time;
     camera.last_time = new_time;
-    GLfloat speed = 0.65f * camera.delta_time;
+    GLfloat speed = 1.5f * camera.delta_time;
 
     glm::vec3 dirfront;
     dirfront.x = cos(camera.pitch * 0.017453f) * cos(camera.yaw * 0.017453f);
@@ -126,6 +136,7 @@ int camera_step(){
         camera.camera_pos += glm::normalize(glm::cross(camera.camera_front, camera.camera_up)) * speed;
     return 0;
 }
+
 
 int main(){
     camera.screen_width = 1450;
@@ -158,6 +169,8 @@ glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     int win_width, win_height;
     glfwGetFramebufferSize(window, &win_width, &win_height);
     glViewport(0, 0, win_width, win_height);
+camera.screen_width = win_width;
+ camera.screen_height = win_height;
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -175,50 +188,134 @@ camera.yaw   = -90.0f;
 camera.pitch = 0.0f;
 camera.last_x = 400;
 camera.last_y = 300;
-camera.camera_pos   = glm::vec3(2.0f, 0.0f,  2.0f);
+camera.camera_pos   = glm::vec3(2.0f, 2.0f,  2.0f);
 camera.camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
 camera.camera_up    = glm::vec3(0.0f, 1.0f,  0.0f);
 /****/
-/**** SHADERS *****/
-GLuint light_sh = compile_shader("../shaders/cube_light_v.c", "../shaders/cube_light_f.c");
+/**** SHADERS *****/ 
+GLuint light_sh = compile_shader("./shaders/cube_light_v.c", "./shaders/cube_light_f.c");
 GLuint light_vao = set_light_vao();
 GLuint sky_texture, sky_VAO;
-GLuint sky_sh = compile_shader("../shaders/sky_map_v.c", "../shaders/sky_map_f.c");
+GLuint sky_sh = compile_shader("./shaders/sky_map_v.c", "./shaders/sky_map_f.c");
 set_sky_box(sky_texture, sky_VAO);
  
-GLuint mirror_sh = compile_shader("../shaders/mirror_v.c", "../shaders/mirror_f.c");
+GLuint mirror_sh = compile_shader("./shaders/mirror_v.c", "./shaders/mirror_f.c");
 GLuint mirror_vao = set_mirror_vao();
 
 GLuint bilb_texture = loaad_bilboard_texture();
 GLuint bilb_vao = bilbord_set_vao();
-GLuint bilb_sh = compile_shader("../shaders/bilbord_v.c", "../shaders/bilbord_f.c");
+GLuint bilb_sh = compile_shader("./shaders/bilbord_v.c", "./shaders/bilbord_f.c");
 
 camera.post_effect = false;
 GLuint post_vao, post_texture, post_buffer;
 set_post_vao( camera.screen_width,  camera.screen_height,  post_buffer,  post_texture,  post_vao);
-GLuint post_sh = compile_shader("../shaders/post_v.c", "../shaders/post_f.c");
+GLuint post_sh = compile_shader("./shaders/post_v.c", "./shaders/post_f.c");
+
+GLuint cube_sh = compile_shader("./shaders/cube_normals_v.c", "./shaders/cube_normals_f.c");
+Material material;
+material.diffuse = load_diffuse_texture();
+material.specular = load_specular_texture();
+material.normal = load_normal_texture();
+material.outline = false;
+GLuint plane_vao = set_plane_vao();
+material.height = load_height_texture();
+
+
+GLuint cubes_vao = set_cubes_vao();
+GLuint sh_buff, sh_texture;
+set_shadow_buff_and_texture(sh_buff, sh_texture, camera.screen_width , camera.screen_height);
+material.shadow = sh_texture;
+GLuint sh_sh = compile_shader("./shaders/cube_normals_shadow_v.c", "./shaders/cube_normals_shadow_f.c");
+camera.paralax = false;
 
 /******/
 
     while(!glfwWindowShouldClose(window)){
         glfwPollEvents();
         camera_step();
-        glClearColor(0.9f, 0.1f, 0.1f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-if(camera.post_effect){
-    glBindFramebuffer(GL_FRAMEBUFFER, post_buffer);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); 
-}
 
         glm::mat4 model(1.0f);
         glm::mat4 view = glm::lookAt(camera.camera_pos, camera.camera_pos + camera.camera_front, camera.camera_up);
         glm::mat4 projection = glm::perspective(0.78539f, camera.screen_width / camera.screen_height, 0.1f, 100.0f);
         
-        drow_light(light_vao, light_sh, model, view, projection);
+    glm::vec3 light_pos = glm::vec3(2.0f + 1.0f, 3.0f, 3.0f + 3.5f*glm::sin(1.2f*glfwGetTime()));
 
-        drow_mirror_box(mirror_vao,  mirror_sh,  glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 0.0f, 5.0f)), view,  projection, sky_texture,  camera.camera_pos);
+ /////////////////////////////////////////////////////////////////////////
+
+        glBindFramebuffer(GL_FRAMEBUFFER, sh_buff);
+        glViewport(0, 0, camera.screen_width, camera.screen_height);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        float a_prj = 1.0f, b_prj = 13.0f;
+        glm::mat4 light_projection = glm::ortho(-15.0f, 15.0f, -15.0f, 15.0f, a_prj, b_prj);
+        glm::mat4 light_view = glm::lookAt(light_pos, glm::vec3(-3.0f, 0.0f - 3.0f, 4.3f), glm::vec3( 0.0f, 1.0f,  0.0f));
+        glm::mat4 shadow_matrix = light_projection * light_view;
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+        for(int i = 0; i < 3; i++){
+            glm::mat4 cube_model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.0f -0.5f + i*0.5f, 0.5f + 1.0f , 6.0f - 1.6f*i));
+            cube_model = glm::rotate(cube_model, 0.3f, glm::vec3(0.0f, 0.0f, 1.0f));
+            cube_model = glm::scale(cube_model, glm::vec3(0.5f, 0.5f, 0.5f));
+            my_drow_plane_or_cube(sh_sh,  cubes_vao, camera.camera_pos,  light_pos, cube_model, view, projection,  material, shadow_matrix, 36);
+        }
+        glCullFace(GL_BACK); 
+        glDisable(GL_CULL_FACE);  
+        model = glm::mat4(1.0f);
+        my_drow_plane_or_cube(sh_sh,  plane_vao, camera.camera_pos,  light_pos, model,   view, projection,  material, shadow_matrix, 6);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, camera.screen_width, camera.screen_height);
+        /////////////////////////////////////////////////////////////////////  
+
+if(camera.post_effect){
+        glBindFramebuffer(GL_FRAMEBUFFER, post_buffer);
+        glViewport(0, 0, win_width, win_height);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); 
+    }
+
+        glm::mat4 model_light =  glm::translate(glm::mat4(1.0f), light_pos);
+        model_light = glm::scale(model_light, glm::vec3(0.1f));
+        drow_light(light_vao, light_sh, model_light, view, projection);
+
+
+        glm::mat4 mirror_model = glm::translate(glm::mat4(1.0f), glm::vec3(30.0f, 5.0f, 0.0));
+        mirror_model =   glm::scale(mirror_model, glm::vec3(3.0f));
+        drow_mirror_box(mirror_vao,  mirror_sh,  mirror_model, view,  projection, sky_texture,  camera.camera_pos);
+
+
+
+
+glEnable(GL_STENCIL_TEST);
+glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);  
+glStencilFunc(GL_ALWAYS, 1, 0xFF); 
+glStencilMask(0xFF);
+        for(int i = 0; i < 3; i++){
+            glm::mat4 cube_model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.0f -0.5f + i*0.5f, 0.5f + 1.0f, 6.0f - 1.6f*i));
+            cube_model = glm::rotate(cube_model, 0.3f, glm::vec3(0.0f, 0.0f, 1.0f));
+            cube_model = glm::scale(cube_model, glm::vec3(0.5f, 0.5f, 0.5f));
+            my_drow_plane_or_cube(cube_sh,  cubes_vao, camera.camera_pos,  light_pos, cube_model,   view, projection,  material, shadow_matrix, 36);
+        }
+glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+glStencilMask(0x00);
+material.outline = true;
+for(int i = 0; i < 3; i++){
+            glm::mat4 cube_model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.0f -0.5f + i*0.5f, 0.5f + 1.0f, 6.0f - 1.6f*i));
+            cube_model = glm::rotate(cube_model, 0.3f, glm::vec3(0.0f, 0.0f, 1.0f));
+            cube_model = glm::scale(cube_model, glm::vec3(0.5f, 0.5f, 0.5f));
+            cube_model = glm::scale(cube_model, glm::vec3(1.05f, 1.05f, 1.05f));
+            my_drow_plane_or_cube(cube_sh,  cubes_vao, camera.camera_pos,  light_pos, cube_model,   view, projection,  material, shadow_matrix, 36);
+        }
+material.outline = false;
+glStencilMask(0xFF);
+glDisable(GL_STENCIL_TEST);
+
+
+material.paralax = camera.paralax;
+        my_drow_plane_or_cube(cube_sh,  plane_vao, camera.camera_pos,  light_pos, model,   view, projection,  material, shadow_matrix, 6);
+material.paralax = false;
 
 
         drow_sky_box(sky_VAO, sky_sh, model, view,  projection,  sky_texture);
@@ -227,6 +324,8 @@ if(camera.post_effect){
 
 
 if(camera.post_effect){
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, camera.screen_width, camera.screen_height);
     drow_post_effect(post_vao, post_sh, post_texture);
 }
 

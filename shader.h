@@ -48,7 +48,7 @@ GLuint compile_shader(const char * vertex_path, const char * fragment_path){
     glGetShaderiv(v_sh, GL_COMPILE_STATUS, &GLsuccess);
     if(!GLsuccess){
         glGetShaderInfoLog(v_sh, 512, NULL, infoLog);
-        std::cout << "ERROR_SHADER_VERTEX_COMPILATION_FAILED\n" << infoLog << std::endl;
+        std::cout << "ERROR_SHADER_VERTEX_COMPILATION_FAILED\n " << vertex_path << ' ' << fragment_path << '\n' << infoLog << std::endl;
     }
     f_sh = glCreateShader(GL_FRAGMENT_SHADER); 
     glShaderSource(f_sh, 1, &glchar_fragment_code, NULL);
@@ -56,7 +56,7 @@ GLuint compile_shader(const char * vertex_path, const char * fragment_path){
     glGetShaderiv(f_sh, GL_COMPILE_STATUS, &GLsuccess);
     if(!GLsuccess){
         glGetShaderInfoLog(f_sh, 512, NULL, infoLog);
-        std::cout << "ERROR_SHADER_FRAGMENT_COMPILATION_FAILED\n" << infoLog << std::endl;
+        std::cout << "ERROR_SHADER_FRAGMENT_COMPILATION_FAILED\n " << vertex_path << ' ' << fragment_path << '\n' << infoLog << std::endl;
     }
     program = glCreateProgram();
     glAttachShader(program, v_sh);
@@ -65,7 +65,7 @@ GLuint compile_shader(const char * vertex_path, const char * fragment_path){
     glGetProgramiv(program, GL_LINK_STATUS, &GLsuccess);
     if(!GLsuccess){
     glGetProgramInfoLog(program, 512, NULL, infoLog);
-        std::cout << "ERROR_LINK_SHADER_PROGRAM" << infoLog << std::endl;
+        std::cout << "ERROR_LINK_SHADER_PROGRAM\n " << vertex_path << ' ' << fragment_path << '\n' << infoLog << std::endl;
     }
 glDeleteShader(v_sh);
 glDeleteShader(f_sh);

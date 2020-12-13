@@ -8,7 +8,7 @@ uniform sampler2D screen_texture;
 
 void main(){   
     vec4 tmp_color =  texture(screen_texture, tex_coord);
-    color = vec4(tmp_color.x, 0.0, 0.0, tmp_color.z);
+    color = vec4(tmp_color.x, 0.0, 0.0, 1.0f);
 }
 
 /*  float kernel[9] = float[](
